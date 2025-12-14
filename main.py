@@ -1,10 +1,25 @@
 import json
 import subprocess
 
-CONFIG_PATH = "config.json"
 DCE_PATH = "dce/DiscordChatExporter.Cli"
+
+CONFIG_PATH = "config.json"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
+
+CHANNEL_EXPORT_OPTIONS = [
+    "--fuck-russia",
+    "--output",
+    OUTPUT_PATH,
+    "--media",
+    "--reuse-media",
+    "--media-dir",
+    MEDIA_OUTPUT_PATH,
+    "--markdown",
+    "False",
+    "--format",
+    "Json",
+]
 
 
 def main():
@@ -16,21 +31,11 @@ def main():
             [
                 DCE_PATH,
                 "export",
-                "--fuck-russia",
+                *CHANNEL_EXPORT_OPTIONS,
                 "--channel",
                 category,
                 "--token",
                 config["token"],
-                "--output",
-                OUTPUT_PATH,
-                "--media",
-                "--reuse-media",
-                "--media-dir",
-                MEDIA_OUTPUT_PATH,
-                "--markdown",
-                "False",
-                "--format",
-                "Json",
                 "--after",
                 "2025-12-14 23:59",
             ],
