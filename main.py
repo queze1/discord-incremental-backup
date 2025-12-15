@@ -24,6 +24,22 @@ CHANNEL_EXPORT_OPTIONS = [
 ]
 
 
+def gen_channel_name(channel: discord.abc.GuildChannel):
+    channel_name = ""
+    if channel.category:
+        channel_name += f"{channel.category.name} / "
+    channel_name += channel.name
+    return channel_name
+
+
+def gen_thread_name(thread: discord.Thread):
+    thread_name = ""
+    if thread.channel:
+        thread_name += f"{gen_channel_name(thread.channel)} / "
+    thread_name += thread.name
+    return thread_name
+
+
 async def main():
     with open(CONFIG_PATH) as file:
         config = json.load(file)
@@ -37,11 +53,25 @@ async def main():
 
         try:
             channels = []
+
+            for thread_id in config["threads"]:
+                thread = await client.fetch_channel(thread_id)
+                if not isinstance(thread, discord.Thread):
+                    print(f"{thread.id} is not a thread!")
+                    continue
+
+                channels.append(thread)
+                print(f"Added {gen_thread_name(thread)}.")
+
             for category_id in config["categories"]:
                 category = await client.fetch_channel(category_id)
                 if isinstance(category, discord.CategoryChannel):
                     # Add text channels and their threads + forum threads
                     for channel in category.channels:
+                        if channel.id in config["excluded_channels"]:
+                            print(f"Skipped {gen_channel_name(channel)}.")
+                            continue
+
                         if isinstance(channel, discord.TextChannel):
                             channels.append(channel)
 
@@ -49,10 +79,14 @@ async def main():
                             channel, (discord.TextChannel, discord.ForumChannel)
                         ):
                             threads = [
-                                thread async for thread in channel.archived_threads()
+                                thread
+                                async for thread in channel.archived_threads()
+                                if str(thread.id) not in config["threads"]
                             ]
                             channels.append(threads)
-                            print(f"Found {channel.name} and {len(threads)} threads.")
+                            print(
+                                f"Found {gen_channel_name(channel)} and {len(threads)} threads."
+                            )
 
                 elif isinstance(category, discord.abc.GuildChannel):
                     print(f"{category.name} is not a category!")
