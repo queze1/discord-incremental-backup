@@ -5,6 +5,7 @@ import asyncio
 import discord
 
 CONFIG_PATH = "config.json"
+CHANNEL_CACHE_PATH = "channel_cache.txt"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
 DCE_PATH = "dce/DiscordChatExporter.Cli"
@@ -38,6 +39,28 @@ def gen_thread_name(thread: discord.Thread):
         thread_name += f"{gen_channel_name(thread.channel)} / "
     thread_name += thread.name
     return thread_name
+
+
+def load_channel_ids():
+    try:
+        with open(CHANNEL_CACHE_PATH) as file:
+            return [int(channel_id) for channel_id in file.readlines()]
+    except FileNotFoundError:
+        print("Channel cache is empty.")
+    return []
+
+
+def update_channels_ids(new_channels):
+    old_channel_ids = load_channel_ids()
+    new_channel_ids = [channel.id for channel in new_channels]
+    combined_channel_ids = list(set(old_channel_ids + new_channel_ids))
+
+    with open(CHANNEL_CACHE_PATH, "w") as file:
+        for channel_id in combined_channel_ids:
+            file.write(f"{channel_id}\n")
+
+    print(f"Saved {len(combined_channel_ids)} channels.")
+    return combined_channel_ids
 
 
 async def main():
@@ -80,10 +103,10 @@ async def main():
                         ):
                             threads = [
                                 thread
-                                async for thread in channel.archived_threads()
+                                async for thread in channel.archived_threads(limit=None)
                                 if str(thread.id) not in config["threads"]
                             ]
-                            channels.append(threads)
+                            channels += threads
                             print(
                                 f"Found {gen_channel_name(channel)} and {len(threads)} threads."
                             )
@@ -104,12 +127,12 @@ async def main():
     await client.start(config["token"])
 
     try:
-        result = channels_future.result()
-        print(f"Data received in main: {result}")
-        return result
+        channels = channels_future.result()
     except Exception as e:
-        print(f"An error occurred during execution: {e}")
-        return None
+        print(f"An error occurred while getting channels: {e}")
+        return
+
+    channel_ids = update_channels_ids(channels)
 
     # for category in config["categories"]:
     #     result = subprocess.run(
