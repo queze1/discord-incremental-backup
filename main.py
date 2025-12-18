@@ -186,7 +186,7 @@ async def main():
         channel_duration = channel_end_time - channel_start_time
         formatted_channel_time = str(timedelta(seconds=int(channel_duration)))
         total_duration = channel_end_time - overall_start_time
-        formatted_total_time = str(timedelta(seconds=int(channel_duration)))
+        formatted_total_time = str(timedelta(seconds=int(total_duration)))
         print(
             f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time}; Total Duration: {formatted_total_time} ---\n"
         )
