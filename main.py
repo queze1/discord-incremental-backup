@@ -1,7 +1,9 @@
 import asyncio
-from datetime import timedelta
 import json
+import pathlib
 import time
+import re
+from datetime import timedelta
 
 import discord
 
@@ -14,7 +16,6 @@ MEDIA_OUTPUT_PATH = "output/media"
 
 # 1k messages
 PARTITION_LENGTH = "1000"
-
 CHANNEL_EXPORT_OPTIONS = [
     "--fuck-russia",
     "--output",
@@ -68,6 +69,44 @@ def update_channels_ids(new_channels):
 
     print(f"Saved {len(combined_channel_ids)} channels.")
     return combined_channel_ids
+
+
+def get_resume_point(channel_id, output_dir: str):
+    DCE_PARTITION_PATTERN = rf"\[{channel_id}\](?: \[part (?P<part_n>[0-9]+)\])?\.json"
+
+    files: list[tuple] = []
+    for file in pathlib.Path(output_dir).iterdir():
+        match = re.search(DCE_PARTITION_PATTERN, file.name)
+        if not match:
+            continue
+
+        # No part number = part 1
+        part_n = match.groupdict().get("part_n")
+        part_n = int(part_n) if part_n else 1
+        files.append((file, part_n))
+
+    # Sort files by the part number
+    files.sort(key=lambda x: x[1])
+    if len(files) < 2:
+        return None, []
+
+    # The anchor is the last full file
+    anchor_file = files[-2][0]
+    files_to_delete = [files[-1][0]]
+
+    last_msg_id = None
+    try:
+        with open(anchor_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if "messages" in data and len(data["messages"]) > 0:
+                last_msg = data["messages"][-1]
+                last_msg_id = last_msg["id"]
+    except Exception as e:
+        print(f"Error reading anchor file: {e}")
+        return None, []
+
+    next_part_index = len(files)
+    return last_msg_id, files_to_delete, next_part_index
 
 
 async def main():
