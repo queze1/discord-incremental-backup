@@ -178,6 +178,8 @@ def process_temp_files(channel_id, temp_dir, output_dir, start_index):
 
 
 async def main():
+    overall_start_time = time.perf_counter()
+
     with open(CONFIG_PATH) as file:
         config = json.load(file)
 
@@ -246,10 +248,14 @@ async def main():
         print(f"An error occurred while getting channels: {e}")
         return
 
+    discovery_end_time = time.perf_counter()
+    discovery_duration = discovery_end_time - overall_start_time
+    formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
+    print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
+
     channel_ids = update_channels_ids(channels)
     total_channels = len(channel_ids)
 
-    overall_start_time = time.perf_counter()
     for i, channel_id in enumerate(channel_ids, start=1):
         channel_start_time = time.perf_counter()
 
@@ -350,5 +356,24 @@ async def main():
     print("==========================================")
 
 
+async def run_scheduler():
+    while True:
+        print("\n==========================================")
+        print(f"Starting scheduled run at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("==========================================\n")
+
+        try:
+            await main()
+        except Exception as e:
+            print(f"\nCRITICAL ERROR during export: {e}")
+            print("Waiting for next cycle...")
+
+        print("Sleeping for 30 minutes...")
+        await asyncio.sleep(1800)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(run_scheduler())
+    except KeyboardInterrupt:
+        print("\nScript stopped by user.")
