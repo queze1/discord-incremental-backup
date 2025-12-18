@@ -1,14 +1,17 @@
 import json
 import asyncio
 
-# import subprocess
 import discord
+
+DCE_PATH = "dce/DiscordChatExporter.Cli"
 
 CONFIG_PATH = "config.json"
 CHANNEL_CACHE_PATH = "channel_cache.txt"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
-DCE_PATH = "dce/DiscordChatExporter.Cli"
+
+# 10k messages
+PARTITION_LENGTH = "10000"
 
 CHANNEL_EXPORT_OPTIONS = [
     "--fuck-russia",
@@ -22,6 +25,8 @@ CHANNEL_EXPORT_OPTIONS = [
     "False",
     "--format",
     "Json",
+    "--partition",
+    PARTITION_LENGTH,
 ]
 
 
