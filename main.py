@@ -1,5 +1,7 @@
-import json
 import asyncio
+from datetime import timedelta
+import json
+import time
 
 import discord
 
@@ -138,23 +140,65 @@ async def main():
         return
 
     channel_ids = update_channels_ids(channels)
+    total_channels = len(channel_ids)
 
-    # for category in config["categories"]:
-    #     result = subprocess.run(
-    #         [
-    #             DCE_PATH,
-    #             "export",
-    #             *CHANNEL_EXPORT_OPTIONS,
-    #             "--channel",
-    #             category,
-    #             "--token",
-    #             config["token"],
-    #             "--after",
-    #             "2025-12-14 23:59",
-    #         ],
-    #         stdout=subprocess.PIPE,
-    #     )
-    #     print(result.stdout.decode())
+    overall_start_time = time.perf_counter()
+    for i, channel_id in enumerate(channel_ids, start=1):
+        channel_start_time = time.perf_counter()
+        print(
+            f"\n--- [{i}/{total_channels}] Starting Export for Channel ID: {channel_id} ---"
+        )
+
+        args = [
+            DCE_PATH,
+            "export",
+            *CHANNEL_EXPORT_OPTIONS,
+            "--channel",
+            str(channel_id),
+            "--token",
+            config["token"],
+        ]
+
+        process = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+
+        assert process.stdout is not None, (
+            "Process stdout is None despite requesting PIPE"
+        )
+
+        # Print DCE output to console
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+
+            decoded_line = line.decode("utf-8", errors="replace").rstrip()
+            if decoded_line:
+                print(decoded_line)
+
+        await process.wait()
+
+        # Print channel duration
+        channel_end_time = time.perf_counter()
+        channel_duration = channel_end_time - channel_start_time
+        formatted_channel_time = str(timedelta(seconds=int(channel_duration)))
+        print(
+            f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time} ---\n"
+        )
+
+    # Print total duration
+    overall_end_time = time.perf_counter()
+    total_duration = overall_end_time - overall_start_time
+    formatted_total_time = str(timedelta(seconds=int(total_duration)))
+
+    print("==========================================")
+    print("All exports completed.")
+    print(f"Total Channels: {total_channels}")
+    print(f"Total Time Elapsed: {formatted_total_time}")
+    print("==========================================")
 
 
 if __name__ == "__main__":
