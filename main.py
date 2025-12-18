@@ -181,12 +181,14 @@ async def main():
 
         await process.wait()
 
-        # Print channel duration
+        # Print durations
         channel_end_time = time.perf_counter()
         channel_duration = channel_end_time - channel_start_time
         formatted_channel_time = str(timedelta(seconds=int(channel_duration)))
+        total_duration = channel_end_time - overall_start_time
+        formatted_total_time = str(timedelta(seconds=int(channel_duration)))
         print(
-            f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time} ---\n"
+            f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time}; Total Duration: {formatted_total_time} ---\n"
         )
 
     # Print total duration
