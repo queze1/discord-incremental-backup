@@ -12,8 +12,8 @@ CHANNEL_CACHE_PATH = "channel_cache.txt"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
 
-# 10k messages
-PARTITION_LENGTH = "10000"
+# 1k messages
+PARTITION_LENGTH = "1000"
 
 CHANNEL_EXPORT_OPTIONS = [
     "--fuck-russia",
@@ -98,7 +98,7 @@ async def main():
                 if isinstance(category, discord.CategoryChannel):
                     # Add text channels and their threads + forum threads
                     for channel in category.channels:
-                        if channel.id in config["excluded_channels"]:
+                        if str(channel.id) in config["excluded_channels"]:
                             print(f"Skipped {gen_channel_name(channel)}.")
                             continue
 
