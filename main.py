@@ -1,8 +1,10 @@
 import asyncio
 import json
+import os
 import pathlib
-import time
 import re
+import shutil
+import time
 from datetime import timedelta
 
 import discord
@@ -13,13 +15,12 @@ CONFIG_PATH = "config.json"
 CHANNEL_CACHE_PATH = "channel_cache.txt"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
+TEMP_DIR = "output_temp"
 
 # 1k messages
 PARTITION_LENGTH = "1000"
 CHANNEL_EXPORT_OPTIONS = [
     "--fuck-russia",
-    "--output",
-    OUTPUT_PATH,
     "--media",
     "--reuse-media",
     "--media-dir",
@@ -71,28 +72,59 @@ def update_channels_ids(new_channels):
     return combined_channel_ids
 
 
-def get_resume_point(channel_id, output_dir: str):
-    DCE_PARTITION_PATTERN = rf"\[{channel_id}\](?: \[part (?P<part_n>[0-9]+)\])?\.json"
+def parse_dce_filename(filename, channel_id):
+    """
+    Parses a filename to see if it belongs to the given channel_id.
 
+    Returns:
+        (base_name, part_number): if match found.
+        (None, None): if no match.
+
+    Note: part_number defaults to 1 if the file has no [part N] tag.
+    """
+    # Explanation:
+    # ^(.*\[{channel_id}\])  -> Group 1: Base name. Matches everything up to and including [12345]
+    # (?: \[part (\d+)\])?   -> Group 2: Optional part number. Matches " [part 5]"
+    # .*                     -> Anything else
+    # \.json$                -> Must end with .json
+    pattern = re.compile(rf"^(.*\[{channel_id}\])(?: \[part (\d+)\])?.*\.json$")
+    match = pattern.match(filename)
+
+    if not match:
+        return None, None
+
+    base_name = match.group(1)
+    part_str = match.group(2)
+
+    # If "part" is missing, it is implicitly part 1
+    part_num = int(part_str) if part_str else 1
+
+    return base_name, part_num
+
+
+def get_resume_point(channel_id, output_dir: str):
     files: list[tuple] = []
-    for file in pathlib.Path(output_dir).iterdir():
-        match = re.search(DCE_PARTITION_PATTERN, file.name)
-        if not match:
+    output_path = pathlib.Path(output_dir)
+
+    if not output_path.exists():
+        return None, [], None
+
+    for file in output_path.iterdir():
+        _, part_n = parse_dce_filename(file.name, channel_id)
+
+        if part_n is None:
             continue
 
-        # No part number = part 1
-        part_n = match.groupdict().get("part_n")
-        part_n = int(part_n) if part_n else 1
         files.append((file, part_n))
 
-    # Sort files by the part number
     files.sort(key=lambda x: x[1])
-    if len(files) < 2:
-        return None, []
 
-    # The anchor is the last full file
+    if len(files) < 2:
+        return None, [], None
+
     anchor_file = files[-2][0]
-    files_to_delete = [files[-1][0]]
+    tail_file = files[-1][0]
+    files_to_delete = [tail_file]
 
     last_msg_id = None
     try:
@@ -102,11 +134,47 @@ def get_resume_point(channel_id, output_dir: str):
                 last_msg = data["messages"][-1]
                 last_msg_id = last_msg["id"]
     except Exception as e:
-        print(f"Error reading anchor file: {e}")
-        return None, []
+        print(f"Error reading anchor file {anchor_file}: {e}")
+        return None, [], None
 
-    next_part_index = len(files)
+    next_part_index = files[-1][1]
+
     return last_msg_id, files_to_delete, next_part_index
+
+
+def process_temp_files(channel_id, temp_dir, output_dir, start_index):
+    temp_path = pathlib.Path(temp_dir)
+    output_path = pathlib.Path(output_dir)
+
+    if not temp_path.exists():
+        return 0
+
+    found_files = []
+
+    for file in temp_path.iterdir():
+        base_name, _ = parse_dce_filename(file.name, channel_id)
+
+        if base_name:
+            found_files.append((file, base_name))
+
+    # Sort files by name so [part 1] is processed before [part 2]
+    found_files.sort(key=lambda x: x[0].name)
+
+    current_index = start_index
+    files_moved = 0
+
+    for file_obj, base_name in found_files:
+        # Construct new name: BaseName + [part N].json
+        new_name = f"{base_name} [part {current_index}].json"
+        dest_path = output_path.joinpath(new_name)
+
+        print(f"Moving temp file: '{file_obj.name}' -> '{new_name}'")
+        shutil.move(str(file_obj), str(dest_path))
+
+        current_index += 1
+        files_moved += 1
+
+    return files_moved
 
 
 async def main():
@@ -184,22 +252,52 @@ async def main():
     overall_start_time = time.perf_counter()
     for i, channel_id in enumerate(channel_ids, start=1):
         channel_start_time = time.perf_counter()
-        print(
-            f"\n--- [{i}/{total_channels}] Starting Export for Channel ID: {channel_id} ---"
+
+        print(f"\n--- [{i}/{total_channels}] Processing {channel_id} ---")
+
+        # Clear temp dir before starting a new channel
+        for f in os.listdir(TEMP_DIR):
+            try:
+                os.remove(os.path.join(TEMP_DIR, f))
+            except Exception:
+                pass
+
+        cmd_args = [DCE_PATH, "export"] + CHANNEL_EXPORT_OPTIONS
+
+        last_msg_id, files_to_delete, next_part_index = get_resume_point(
+            channel_id, OUTPUT_PATH
         )
 
-        args = [
-            DCE_PATH,
-            "export",
-            *CHANNEL_EXPORT_OPTIONS,
-            "--channel",
-            str(channel_id),
-            "--token",
-            config["token"],
-        ]
+        is_resuming = False
 
+        if last_msg_id:
+            is_resuming = True
+            print(f"Resuming after Message ID: {last_msg_id}")
+            print(f"Next partition index: {next_part_index}")
+
+            # Delete the incomplete tail files
+            for f in files_to_delete:
+                print(f"Deleting incomplete tail file: {f.name}")
+                os.remove(f)
+
+            # Export to temp directory using --after
+            cmd_args.extend(["--after", last_msg_id, "--output", TEMP_DIR])
+        else:
+            print("Starting fresh export.")
+            cmd_args.extend(["--output", OUTPUT_PATH])
+
+        cmd_args.extend(
+            [
+                "--channel",
+                str(channel_id),
+                "--token",
+                config["token"],
+            ]
+        )
+
+        # Run the DCE command
         process = await asyncio.create_subprocess_exec(
-            *args,
+            *cmd_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
@@ -209,6 +307,7 @@ async def main():
         )
 
         # Print DCE output to console
+        print()
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -219,6 +318,15 @@ async def main():
                 print(decoded_line)
 
         await process.wait()
+        print()
+
+        # Resume post-processing
+        if is_resuming and process.returncode == 0:
+            print("Moving and renaming incremental files...")
+            moved_count = process_temp_files(
+                channel_id, TEMP_DIR, OUTPUT_PATH, next_part_index
+            )
+            print(f"Successfully processed {moved_count} new partition files.")
 
         # Print durations
         channel_end_time = time.perf_counter()
@@ -227,7 +335,7 @@ async def main():
         total_duration = channel_end_time - overall_start_time
         formatted_total_time = str(timedelta(seconds=int(total_duration)))
         print(
-            f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time}; Total Duration: {formatted_total_time} ---\n"
+            f"--- Finished [{i}/{total_channels}]. Duration: {formatted_channel_time} | Total Duration: {formatted_total_time} ---\n"
         )
 
     # Print total duration
