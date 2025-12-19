@@ -102,6 +102,37 @@ def parse_dce_filename(filename, channel_id):
     return base_name, part_num
 
 
+def normalize_json_paths(file_path, media_folder_name="media"):
+    """
+    Reads a JSON file and replaces absolute paths containing the media folder
+    with a relative path.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        def walk_and_fix(obj):
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    obj[key] = walk_and_fix(value)
+            elif isinstance(obj, list):
+                return [walk_and_fix(item) for item in obj]
+            elif isinstance(obj, str):
+                search_str = f"{media_folder_name}/"
+                if search_str in obj:
+                    idx = obj.find(search_str)
+                    return obj[idx:]
+            return obj
+
+        fixed_data = walk_and_fix(data)
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(fixed_data, f, indent=2)
+
+    except Exception as e:
+        print(f"Error normalising paths in {file_path}: {e}")
+
+
 def get_resume_point(channel_id, output_dir: str):
     files: list[tuple] = []
     output_path = pathlib.Path(output_dir)
@@ -152,24 +183,27 @@ def process_temp_files(channel_id, temp_dir, output_dir, start_index):
     found_files = []
 
     for file in temp_path.iterdir():
-        base_name, _ = parse_dce_filename(file.name, channel_id)
+        base_name, part_n = parse_dce_filename(file.name, channel_id)
 
         if base_name:
-            found_files.append((file, base_name))
+            found_files.append((file, base_name, part_n))
 
-    # Sort files by name so [part 1] is processed before [part 2]
-    found_files.sort(key=lambda x: x[0].name)
+    # Sort files by part id
+    found_files.sort(key=lambda x: x[2])
 
     current_index = start_index
     files_moved = 0
 
-    for file_obj, base_name in found_files:
+    for file_obj, base_name, _ in found_files:
         # Construct new name: BaseName + [part N].json
         new_name = f"{base_name} [part {current_index}].json"
         dest_path = output_path.joinpath(new_name)
 
         print(f"Moving temp file: '{file_obj.name}' -> '{new_name}'")
         shutil.move(str(file_obj), str(dest_path))
+
+        print(f"Normalizing paths in {new_name}...")
+        normalize_json_paths(dest_path, media_folder_name="media")
 
         current_index += 1
         files_moved += 1
@@ -239,21 +273,22 @@ async def main():
             print("Closing client...")
             await client.close()
 
-    print("Starting Discord client...")
-    await client.start(config["token"])
+    # print("Starting Discord client...")
+    # await client.start(config["token"])
 
-    try:
-        channels = channels_future.result()
-    except Exception as e:
-        print(f"An error occurred while getting channels: {e}")
-        return
+    # try:
+    #     channels = channels_future.result()
+    # except Exception as e:
+    #     print(f"An error occurred while getting channels: {e}")
+    #     return
 
-    discovery_end_time = time.perf_counter()
-    discovery_duration = discovery_end_time - overall_start_time
-    formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
-    print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
+    # discovery_end_time = time.perf_counter()
+    # discovery_duration = discovery_end_time - overall_start_time
+    # formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
+    # print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
 
-    channel_ids = update_channels_ids(channels)
+    # channel_ids = update_channels_ids(channels)
+    channel_ids = [1343411976235126825]
     total_channels = len(channel_ids)
 
     for i, channel_id in enumerate(channel_ids, start=1):
