@@ -368,8 +368,8 @@ async def run_scheduler():
             print(f"\nCRITICAL ERROR during export: {e}")
             print("Waiting for next cycle...")
 
-        print("Sleeping for 30 minutes...")
-        await asyncio.sleep(1800)
+        print("Sleeping for 4 hours...")
+        await asyncio.sleep(3600 * 4)
 
 
 if __name__ == "__main__":
