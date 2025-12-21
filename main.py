@@ -273,22 +273,21 @@ async def main():
             print("Closing client...")
             await client.close()
 
-    # print("Starting Discord client...")
-    # await client.start(config["token"])
+    print("Starting Discord client...")
+    await client.start(config["token"])
 
-    # try:
-    #     channels = channels_future.result()
-    # except Exception as e:
-    #     print(f"An error occurred while getting channels: {e}")
-    #     return
+    try:
+        channels = channels_future.result()
+    except Exception as e:
+        print(f"An error occurred while getting channels: {e}")
+        return
 
-    # discovery_end_time = time.perf_counter()
-    # discovery_duration = discovery_end_time - overall_start_time
-    # formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
-    # print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
+    discovery_end_time = time.perf_counter()
+    discovery_duration = discovery_end_time - overall_start_time
+    formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
+    print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
 
-    # channel_ids = update_channels_ids(channels)
-    channel_ids = [1343411976235126825]
+    channel_ids = update_channels_ids(channels)
     total_channels = len(channel_ids)
 
     for i, channel_id in enumerate(channel_ids, start=1):
