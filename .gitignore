@@ -209,4 +209,4 @@ __marimo__/
 config.json
 dce
 output
-channel_cache.txt
+channel_ids.txt

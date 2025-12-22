@@ -12,7 +12,7 @@ import discord
 DCE_PATH = "dce/DiscordChatExporter.Cli"
 
 CONFIG_PATH = "config.json"
-CHANNEL_CACHE_PATH = "channel_cache.txt"
+CHANNEL_IDS_PATH = "channel_ids.txt"
 OUTPUT_PATH = "output"
 MEDIA_OUTPUT_PATH = "output/media"
 TEMP_DIR = "output_temp"
@@ -52,7 +52,7 @@ def gen_thread_name(thread: discord.Thread):
 
 def load_channel_ids():
     try:
-        with open(CHANNEL_CACHE_PATH) as file:
+        with open(CHANNEL_IDS_PATH) as file:
             return [int(channel_id) for channel_id in file.readlines()]
     except FileNotFoundError:
         print("Channel cache is empty.")
@@ -64,7 +64,7 @@ def update_channels_ids(new_channels):
     new_channel_ids = [channel.id for channel in new_channels]
     combined_channel_ids = list(set(old_channel_ids + new_channel_ids))
 
-    with open(CHANNEL_CACHE_PATH, "w") as file:
+    with open(CHANNEL_IDS_PATH, "w") as file:
         for channel_id in combined_channel_ids:
             file.write(f"{channel_id}\n")
 
@@ -408,6 +408,11 @@ async def run_scheduler():
 
 if __name__ == "__main__":
     try:
+        # Ensure dirs exist
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        os.makedirs(OUTPUT_PATH, exist_ok=True)
+        os.makedirs(MEDIA_OUTPUT_PATH, exist_ok=True)
+
         asyncio.run(run_scheduler())
     except KeyboardInterrupt:
         print("\nScript stopped by user.")

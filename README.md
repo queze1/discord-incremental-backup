@@ -1,5 +1,29 @@
 # discord-incremental-backup
-A script which uses [DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter) to export all channels and threads in Discord channel categories, updating them incrementally.
+A script which uses [Tyrrrz/DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter) to make incremental backups of Discord channel categories, including threads and forum posts to be viewed in [slatinsky/DiscordChatExporter-frontend](https://github.com/slatinsky/DiscordChatExporter-frontend). Tested on Linux only.
 
 **Note:**
 Automating user accounts is against Discord TOS. Use at your own risk.
+
+## Usage (Linux)
+1. TODO
+
+## How It Works
+1. Find Discord channels, threads and forum posts according to `config.json`.
+2. Save newly found channels to `channel_ids.txt`, creating it if it doesn't exist.
+3. Incrementally export each channel into `/output`:
+    1. If a pre-existing export does not exist, or if only one partition exists (channels are split every 1000 messages by default), overwrite the previous export.
+    2. If more than one partition exists:
+        - Delete the latest (incomplete) partition.
+        - Export into `/output_temp`, starting from the last message of the second-last partition.
+        - Move the new partitions into `/output` and rename them.
+        - Normalise paths so they point to `/output/media`.
+        - E.g. A channel has 5000 messages, 2500 of which are backed up into 3 partitions. The 3rd partition (containing 500 messages) is deleted, and the export begins from the 2001st message. 3 new partitions are created into `/output_temp`. Then, they are moved into `/output` and renamed to parts 3-5.
+4. Sleep (4 hours by default) then repeat.
+
+## Differences with [slatinsky/DiscordChatExporter-incrementalBackup](https://github.com/slatinsky/DiscordChatExporter-incrementalBackup)
+1. Intended for personal use.
+2. Only supports one Discord token.
+3. Backs up channel categories, not servers.
+4. Allows excluding Discord channels from backup.
+5. Uses [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self) to find archived threads and forum posts instead of DCE (faster).
+6. Requires manual input for active threads/forum posts (limitation from [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self)).
