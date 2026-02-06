@@ -61,7 +61,6 @@ python3 main.py
         - Move the new partitions into `/output` and rename them.
         - Normalise paths so they point to `/output/media`.
         - E.g. A channel has 5000 messages, 2500 of which are backed up into 3 partitions. The 3rd partition (containing 500 messages) is deleted, and the export begins from the 2001st message. 3 new partitions are created into `/output_temp`. Then, they are moved into `/output` and renamed to parts 3-5.
-4. Sleep (4 hours by default) then repeat.
 
 ## Differences with [slatinsky/DiscordChatExporter-incrementalBackup](https://github.com/slatinsky/DiscordChatExporter-incrementalBackup)
 1. Intended for personal use.

@@ -390,20 +390,21 @@ async def main():
     print("==========================================")
 
 
-async def run_scheduler():
-    while True:
-        print("\n==========================================")
-        print(f"Starting scheduled run at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("==========================================\n")
+# Disabled scheduler for now
+# async def run_scheduler():
+#     while True:
+#         print("\n==========================================")
+#         print(f"Starting scheduled run at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+#         print("==========================================\n")
 
-        try:
-            await main()
-        except Exception as e:
-            print(f"\nCRITICAL ERROR during export: {e}")
-            print("Waiting for next cycle...")
+#         try:
+#             await main()
+#         except Exception as e:
+#             print(f"\nCRITICAL ERROR during export: {e}")
+#             print("Waiting for next cycle...")
 
-        print("Sleeping for 4 hours...")
-        await asyncio.sleep(3600 * 4)
+#         print("Sleeping for 4 hours...")
+#         await asyncio.sleep(3600 * 4)
 
 
 if __name__ == "__main__":
@@ -413,6 +414,7 @@ if __name__ == "__main__":
         os.makedirs(OUTPUT_PATH, exist_ok=True)
         os.makedirs(MEDIA_OUTPUT_PATH, exist_ok=True)
 
-        asyncio.run(run_scheduler())
+        asyncio.run(main())
+        # asyncio.run(run_scheduler())
     except KeyboardInterrupt:
         print("\nScript stopped by user.")
