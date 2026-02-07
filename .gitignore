@@ -209,6 +209,7 @@ __marimo__/
 config.json
 dce
 output
+output_temp
 channel_ids.txt
 GEMINI.md
 .gemini

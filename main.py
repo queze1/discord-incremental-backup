@@ -133,6 +133,39 @@ def normalize_json_paths(file_path, media_folder_name="media"):
         print(f"Error normalising paths in {file_path}: {e}")
 
 
+def get_last_archived_message_id(channel_id, output_dir: str):
+    """
+    Finds the last message ID in the existing archive for a channel.
+    """
+    files: list[tuple] = []
+    output_path = pathlib.Path(output_dir)
+
+    if not output_path.exists():
+        return None
+
+    for file in output_path.iterdir():
+        _, part_n = parse_dce_filename(file.name, channel_id)
+        if part_n is not None:
+            files.append((file, part_n))
+
+    if not files:
+        return None
+
+    # Sort by partition number and pick the last one
+    files.sort(key=lambda x: x[1])
+    last_file = files[-1][0]
+
+    try:
+        with open(last_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if "messages" in data and len(data["messages"]) > 0:
+                return data["messages"][-1]["id"]
+    except Exception:
+        pass
+
+    return None
+
+
 def get_resume_point(channel_id, output_dir: str):
     files: list[tuple] = []
     output_path = pathlib.Path(output_dir)
@@ -288,10 +321,29 @@ async def main():
     print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
 
     channel_ids = update_channels_ids(channels)
+
+    # Create a mapping of channel ID to object for lookup
+    channel_map = {c.id: c for c in channels}
     total_channels = len(channel_ids)
 
     for i, channel_id in enumerate(channel_ids, start=1):
         channel_start_time = time.perf_counter()
+
+        # Check if we should skip based on last message ID
+        channel_obj = channel_map.get(channel_id)
+        if (
+            channel_obj
+            and hasattr(channel_obj, "last_message_id")
+            and channel_obj.last_message_id
+        ):
+            last_archived_id = get_last_archived_message_id(channel_id, OUTPUT_PATH)
+            if last_archived_id and str(channel_obj.last_message_id) == str(
+                last_archived_id
+            ):
+                print(
+                    f"\n--- [{i}/{total_channels}] Skipping {channel_id} (already up to date) ---"
+                )
+                continue
 
         print(f"\n--- [{i}/{total_channels}] Processing {channel_id} ---")
 
