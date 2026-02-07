@@ -210,3 +210,5 @@ config.json
 dce
 output
 channel_ids.txt
+GEMINI.md
+.gemini
