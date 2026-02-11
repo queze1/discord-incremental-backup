@@ -261,16 +261,24 @@ async def main():
             channels = []
 
             for thread_id in config["threads"]:
-                thread = await client.fetch_channel(thread_id)
-                if not isinstance(thread, discord.Thread):
-                    print(f"{thread.id} is not a thread!")
-                    continue
+                try:
+                    thread = await client.fetch_channel(thread_id)
+                    if not isinstance(thread, discord.Thread):
+                        print(f"{thread.id} is not a thread!")
+                        continue
 
-                channels.append(thread)
-                print(f"Added {gen_thread_name(thread)}.")
+                    channels.append(thread)
+                    print(f"Added {gen_thread_name(thread)}.")
+                except (discord.Forbidden, discord.NotFound):
+                    print(f"No access to thread {thread_id}. Skipping.")
 
             for category_id in config["categories"]:
-                category = await client.fetch_channel(category_id)
+                try:
+                    category = await client.fetch_channel(category_id)
+                except (discord.Forbidden, discord.NotFound):
+                    print(f"No access to category {category_id}. Skipping.")
+                    continue
+
                 if isinstance(category, discord.CategoryChannel):
                     # Add text channels and their threads + forum threads
                     for channel in category.channels:
