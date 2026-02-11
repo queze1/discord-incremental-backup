@@ -3,20 +3,46 @@ import discord
 CHANNEL_IDS_PATH = "channel_ids.txt"
 
 
-def gen_channel_name(channel: discord.abc.GuildChannel):
-    channel_name = ""
-    if channel.category:
-        channel_name += f"{channel.category.name} / "
-    channel_name += channel.name
-    return channel_name
+def get_display_name(obj):
+    name = f"{obj.category.name} / " if getattr(obj, "category", None) else ""
+    if isinstance(obj, discord.Thread) and obj.channel:
+        name = f"{get_display_name(obj.channel)} / "
+    return f"{name}{obj.name}"
 
 
-def gen_thread_name(thread: discord.Thread):
-    thread_name = ""
-    if thread.channel:
-        thread_name += f"{gen_channel_name(thread.channel)} / "
-    thread_name += thread.name
-    return thread_name
+class ChannelCollector:
+    def __init__(self, client: discord.Client):
+        self.client = client
+        self.channels: list = []
+        self.seen_ids: set[int] = set()
+
+    async def add_by_id(self, channel_id: int, context_label=""):
+        """Fetch a channel and add it if it hasn't been seen."""
+        if not channel_id or channel_id in self.seen_ids:
+            return
+
+        try:
+            channel = await self.client.fetch_channel(channel_id)
+            self._add_channel_object(channel, context_label)
+        except (discord.Forbidden, discord.NotFound):
+            print(f"No access to {context_label} {channel_id}. Skipping.")
+        except Exception as e:
+            print(f"Error fetching {channel_id}: {e}")
+
+    def _add_channel_object(self, channel, context_label=""):
+        if channel.id in self.seen_ids:
+            return
+
+        if isinstance(channel, discord.abc.PrivateChannel):
+            return
+
+        label = "thread" if isinstance(channel, discord.Thread) else "channel"
+        if context_label:
+            label = f"{context_label} {label}"
+
+        print(f"Added {label} {get_display_name(channel)}.")
+        self.channels.append(channel)
+        self.seen_ids.add(channel.id)
 
 
 def load_channel_ids():
@@ -28,104 +54,49 @@ def load_channel_ids():
     return []
 
 
-def update_channels_ids(new_channels):
-    new_channel_ids = [channel.id for channel in new_channels]
-
+def save_channel_ids(channels):
     with open(CHANNEL_IDS_PATH, "w") as file:
-        for channel_id in new_channel_ids:
-            file.write(f"{channel_id}\n")
+        for channel in channels:
+            file.write(f"{channel.id}\n")
 
-    print(f"Saved {len(new_channel_ids)} channels.")
-    return new_channel_ids
+    print(f"Saved {len(channels)} channels.")
 
 
 async def discover_channels(client: discord.Client, config: dict):
-    channels: list = []
-    seen_ids: set[int] = set()
+    collector = ChannelCollector(client)
 
-    # 1. Check the cache
-    cached_ids = load_channel_ids()
-    for cid in cached_ids:
-        try:
-            channel = await client.fetch_channel(cid)
-            if channel.id not in seen_ids:
-                if isinstance(channel, discord.Thread):
-                    print(f"Added cached thread {gen_thread_name(channel)}.")
-                elif not isinstance(channel, discord.abc.PrivateChannel):
-                    print(f"Added cached channel {gen_channel_name(channel)}.")
-                else:
-                    # Should not happen, Private channels do not belong in a category
-                    print(f"Added cached private channel {channel.id}.")
+    # 1. Process cache
+    for cid in load_channel_ids():
+        await collector.add_by_id(cid, "cached")
 
-                channels.append(channel)
-                seen_ids.add(channel.id)
-        except (discord.Forbidden, discord.NotFound):
-            print(f"No access to cached channel {cid}. Skipping.")
+    # 2. Process config threads
+    for tid in config.get("threads", []):
+        await collector.add_by_id(int(tid), "thread")
 
-    # 2. Check the threads in config
-    for thread_id in config.get("threads", []):
-        try:
-            tid = int(thread_id)
-            if tid in seen_ids:
-                continue
-
-            thread = await client.fetch_channel(tid)
-            if not isinstance(thread, discord.Thread):
-                print(f"{thread.id} is not a thread!")
-                continue
-
-            print(f"Added thread {gen_thread_name(thread)}.")
-            channels.append(thread)
-            seen_ids.add(thread.id)
-
-        except (discord.Forbidden, discord.NotFound):
-            print(f"No access to thread {thread_id}. Skipping.")
-        except ValueError:
-            print(f"Invalid thread ID in config: {thread_id}")
-
-    # 3. Check the categories
+    # 3. Process categories
     excluded_ids = {int(i) for i in config.get("excluded_channels", [])}
     for category_id in config.get("categories", []):
         try:
-            cid = int(category_id)
-            category = await client.fetch_channel(cid)
-        except (discord.Forbidden, discord.NotFound):
-            print(f"No access to category {category_id}. Skipping.")
-            continue
-        except ValueError:
-            print(f"Invalid category ID in config: {category_id}")
-            continue
+            category = await client.fetch_channel(int(category_id))
+            if not isinstance(category, discord.CategoryChannel):
+                print(f"{category_id} is not a category!")
+                continue
 
-        if isinstance(category, discord.CategoryChannel):
-            # Add text channels and their threads + forum threads
             for channel in category.channels:
                 if channel.id in excluded_ids:
-                    print(f"Skipped {gen_channel_name(channel)}.")
                     continue
 
-                if channel.id in seen_ids:
-                    continue
-
+                # Add the channel itself
                 if isinstance(channel, discord.TextChannel):
-                    print(f"Added channel {gen_channel_name(channel)}.")
-                    channels.append(channel)
-                    seen_ids.add(channel.id)
+                    collector._add_channel_object(channel)
 
+                # Add archived threads
                 if isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
                     async for thread in channel.archived_threads(limit=None):
-                        if thread.id in seen_ids:
-                            continue
+                        collector._add_channel_object(thread, "archived thread")
 
-                        print(
-                            f"Found archived thread {gen_thread_name(thread)} in {gen_channel_name(channel)}."
-                        )
-                        channels.append(thread)
-                        seen_ids.add(thread.id)
+        except (discord.Forbidden, discord.NotFound):
+            print(f"No access to category {category_id}. Skipping.")
 
-        elif isinstance(category, discord.abc.GuildChannel):
-            print(f"{category.name} is not a category!")
-        else:
-            print(f"{category.id} is not a category!")
-
-    update_channels_ids(channels)
-    return channels
+    save_channel_ids(collector.channels)
+    return collector.channels
