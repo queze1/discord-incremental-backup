@@ -9,7 +9,7 @@ from datetime import timedelta
 
 import discord
 
-from discovery import discover_channels, update_channels_ids
+from discovery import discover_channels
 
 DCE_PATH = "dce/DiscordChatExporter.Cli"
 
@@ -242,24 +242,15 @@ async def main():
     formatted_discovery_time = str(timedelta(seconds=int(discovery_duration)))
     print(f"Found {len(channels)} channels in {formatted_discovery_time}.")
 
-    channel_ids = update_channels_ids(channels)
-
-    # Create a mapping of channel ID to object for lookup
-    channel_map = {c.id: c for c in channels}
-    total_channels = len(channel_ids)
-
-    for i, channel_id in enumerate(channel_ids, start=1):
+    total_channels = len(channels)
+    for i, channel in enumerate(channels, start=1):
         channel_start_time = time.perf_counter()
 
         # Check if we should skip based on last message ID
-        channel_obj = channel_map.get(channel_id)
-        if (
-            channel_obj
-            and hasattr(channel_obj, "last_message_id")
-            and channel_obj.last_message_id
-        ):
-            last_archived_id = get_last_archived_message_id(channel_id, OUTPUT_PATH)
-            if last_archived_id and str(channel_obj.last_message_id) == str(
+        channel_id = channel.id
+        if hasattr(channel, "last_message_id") and channel.last_message_id:
+            last_archived_id = get_last_archived_message_id(channel.id, OUTPUT_PATH)
+            if last_archived_id and str(channel.last_message_id) == str(
                 last_archived_id
             ):
                 print(
