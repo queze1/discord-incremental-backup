@@ -54,9 +54,10 @@ python3 main.py
 1. Find channels from `channel_ids.txt`, skipping inaccessible or invalid channels.
 2. Find Discord channels, threads and forum posts according to `config.json`.
 3. Save successfully found channels to `channel_ids.txt`.
-4. Incrementally export each channel into `/output`:
-    1. If a pre-existing export does not exist, or if only one partition exists (channels are split every 1000 messages by default), overwrite the previous export.
-    2. If more than one partition exists:
+4. For each channel:
+    1. If a pre-existing export exists, and the last exported message is identical to the channel's last message (i.e. no new messages), skip.
+    2. If a pre-existing export does not exist, or if only one partition exists (channels are split every 1000 messages by default), export into `/output`, overwriting the previous export.
+    3. If more than one partition exists:
         - Delete the latest (incomplete) partition.
         - Export into `/output_temp`, starting from the last message of the second-last partition.
         - Move the new partitions into `/output` and rename them.
