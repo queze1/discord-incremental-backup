@@ -65,13 +65,12 @@ python3 main.py
         - E.g. A channel has 5000 messages, 2500 of which are backed up into 3 partitions. The 3rd partition (containing 500 messages) is deleted, and the export begins from the 2001st message. 3 new partitions are created into `/output_temp`. Then, they are moved into `/output` and renamed to parts 3-5.
 
 ## Differences with [slatinsky/DiscordChatExporter-incrementalBackup](https://github.com/slatinsky/DiscordChatExporter-incrementalBackup)
-1. Intended for personal use.
-2. Only supports one Discord token.
-3. Backs up channel categories, not servers.
-4. Allows excluding Discord channels from backup.
-5. Uses [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self) to find archived threads and forum posts instead of DCE (faster).
-6. Requires manual input for active threads/forum posts (limitation from [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self)).
-7. Doesn't require installing [slatinsky/DiscordChatExporter-frontend](https://github.com/slatinsky/DiscordChatExporter-frontend).
+1. Only supports one Discord token.
+2. Backs up channel categories, not servers.
+3. Allows excluding Discord channels from backup.
+4. Uses [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self) to find archived threads and forum posts instead of DCE (faster).
+5. Requires manual input for active threads/forum posts (limitation from [dolfies/discord.py-self](https://github.com/dolfies/discord.py-self)).
+6. Doesn't require installing [slatinsky/DiscordChatExporter-frontend](https://github.com/slatinsky/DiscordChatExporter-frontend).
 
 ## Known Issues
 - Images not displaying on [Tyrrrz/DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter), even when the relative path is correct.
